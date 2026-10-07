@@ -94,6 +94,26 @@ textarea{resize:vertical;min-height:70px}
 .cgrid button.sel{background:var(--acc);color:var(--accink)}
 .cgrid span.blank{display:block}
 .quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.hero{background:var(--acc);background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 60%,#000));color:var(--accink);border-radius:18px;padding:16px 18px;margin-bottom:14px}
+.hl{font-size:1.35rem;font-weight:800;letter-spacing:-.01em}
+.hs{opacity:.85;font-size:.9rem;margin:2px 0 10px}
+.hm{height:8px;border-radius:9px;background:rgba(128,128,128,.35);overflow:hidden}
+.hm i{display:block;height:100%;background:var(--accink);border-radius:9px}
+.grp{font-size:.95rem;margin:18px 2px 8px;color:var(--mut);font-weight:600}
+.grp span{background:var(--card);border:1px solid var(--line);border-radius:99px;padding:0 8px;font-size:.8rem;margin-left:4px}
+.task{border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.05)}
+.meter{height:8px;border-radius:9px}
+.pri{display:inline-block;border-radius:6px;padding:0 8px;font-size:.78rem;margin-right:6px;font-weight:600}
+.pri.hi{background:var(--late);color:#fff}.pri.lo{background:var(--bg);color:var(--mut);border:1px solid var(--line)}
+.chk{list-style:none;margin:8px 0 0;padding:0}
+.chk li{margin:2px 0}.chk label{display:flex;gap:8px;align-items:flex-start;color:var(--ink);font-size:.95rem;margin:0;cursor:pointer}
+.chk input{width:18px;height:18px;margin-top:2px;accent-color:var(--c);flex:none}
+.task.done .chk span{text-decoration:line-through;color:var(--mut)}
+.mut{color:var(--mut);font-size:.88rem}
+.sw{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.sw button{width:36px;height:36px;border-radius:50%;border:3px solid var(--card);box-shadow:0 0 0 1px var(--line);cursor:pointer}
+.sw button[aria-pressed="true"]{box-shadow:0 0 0 3px var(--ink)}
+#btnAdd{width:100%;padding:13px;font-size:1.02rem;border-radius:12px}
 </style>
 </head>
 <body>
@@ -103,6 +123,7 @@ textarea{resize:vertical;min-height:70px}
 <p class="sub">Catat tugas, pantau deadline, dan lihat progresmu.</p></div>
 <button class="gear" id="btnBackup" type="button" aria-label="Pengaturan" title="Pengaturan">&#9881;</button></div>
 
+<div class="hero" id="hero"></div>
 <div class="stats">
 <div class="stat"><b id="sAktif">0</b><span>Belum selesai</span></div>
 <div class="stat"><b id="sDekat">0</b><span>Deadline hari ini/besok</span></div>
@@ -130,6 +151,8 @@ textarea{resize:vertical;min-height:70px}
 <div class="full cal" id="calWrap" hidden></div>
 <div class="full"><label for="fTitle">Judul tugas</label><input type="text" id="fTitle" maxlength="120" placeholder="Contoh: LKS halaman 45-47"></div>
 <div class="full"><label for="fDetail">Detail tugas (opsional)</label><textarea id="fDetail" maxlength="1000" placeholder="Catatan, link, atau instruksi guru"></textarea></div>
+<div><label for="fPri">Prioritas</label><select id="fPri"><option value="low">Rendah</option><option value="mid" selected>Sedang</option><option value="high">Tinggi</option></select></div>
+<div class="full"><label for="fSubs">Sub-tugas (satu per baris, opsional)</label><textarea id="fSubs" maxlength="2000" placeholder="Contoh:&#10;Kerjakan soal 1-5&#10;Rangkum materi" style="min-height:80px"></textarea><div class="mut">Jika ada sub-tugas, progres dihitung otomatis dari yang dicentang.</div></div>
 <div class="full"><label for="fProg">Progres: <span id="fProgV">0</span>%</label><input type="range" id="fProg" min="0" max="100" step="5" value="0" style="width:100%"></div>
 </div>
 <div class="msg" id="fMsg" role="alert"></div>
@@ -160,7 +183,9 @@ textarea{resize:vertical;min-height:70px}
 
 <section class="panel">
 <h2 class="h2">Tampilan</h2>
-<label for="setTheme">Tema</label>
+<label>Warna aksen</label>
+<div class="sw" id="swatches"><button type="button" data-c="" aria-label="Bawaan" style="background:linear-gradient(135deg,#3d4fd6 50%,#8c9bff 50%)"></button><button type="button" data-c="#0f9d8a" aria-label="Hijau toska" style="background:#0f9d8a"></button><button type="button" data-c="#d6336c" aria-label="Merah muda" style="background:#d6336c"></button><button type="button" data-c="#e8641c" aria-label="Oranye" style="background:#e8641c"></button><button type="button" data-c="#7048e8" aria-label="Ungu" style="background:#7048e8"></button></div>
+<label for="setTheme" style="margin-top:12px">Tema</label>
 <select id="setTheme"><option value="auto">Otomatis (ikuti perangkat)</option><option value="light">Terang</option><option value="dark">Gelap</option></select>
 </section>
 
@@ -194,7 +219,7 @@ textarea{resize:vertical;min-height:70px}
 <script>
 (function(){
 "use strict";
-var KEY="tugas-sekolah-v1", mem=null, tasks=[], filter="aktif", editId=null;
+var W={high:0,mid:1,low:2}, KEY="tugas-sekolah-v1", mem=null, tasks=[], filter="aktif", editId=null;
 var $=function(id){return document.getElementById(id)};
 
 function load(){
@@ -214,8 +239,11 @@ function clean(t){
   var due=mm[0];
   var p=Number(t.progress); if(isNaN(p)) p=0; p=Math.max(0,Math.min(100,Math.round(p)));
   var done=!!t.done; if(done) p=100;
+  var subs=Array.isArray(t.subs)?t.subs.map(function(x){return x&&x.t?{t:String(x.t).slice(0,120),d:!!x.d}:null}).filter(Boolean).slice(0,30):[];
+  var pri=(t.pri==="high"||t.pri==="low")?t.pri:"mid";
+  if(subs.length){p=Math.round(subs.filter(function(x){return x.d}).length*100/subs.length); done=p===100;}
   return {id:String(t.id||uid()),subject:String(t.subject||"").slice(0,60),title:String(t.title||"").slice(0,120)||"(tanpa judul)",
-    detail:String(t.detail||"").slice(0,1000),due:due,progress:p,done:done};
+    detail:String(t.detail||"").slice(0,1000),due:due,progress:p,done:done,subs:subs,pri:pri};
 }
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 
@@ -255,6 +283,9 @@ function render(){
   var aktif=0,dekat=0,late=0,done=0;
   tasks.forEach(function(t){var l=level(t,now); if(t.done) done++; else {aktif++; if(l==="hot") dekat++; if(l==="late") late++;}});
   $("sAktif").textContent=aktif;$("sDekat").textContent=dekat;$("sLate").textContent=late;$("sDone").textContent=done;
+  var tdy=0; tasks.forEach(function(t){if(!t.done&&dayDiff(t.due)===0) tdy++;});
+  var tot=tasks.length, pct=tot?Math.round(done*100/tot):0;
+  $("hero").innerHTML='<div class="hl">'+(late?late+" tugas terlambat":tdy?tdy+" tugas jatuh tempo hari ini":aktif?"Tidak ada deadline hari ini":tot?"Semua tugas selesai \uD83C\uDF89":"Belum ada tugas")+'</div><div class="hs">'+(tot?done+" dari "+tot+" tugas selesai":"Tekan Tambah tugas untuk mulai")+'</div><div class="hm"><i style="width:'+pct+'%"></i></div>';
   // subject filter options
   var subs=[],seen={};
   tasks.forEach(function(t){var s=t.subject; if(s&&!seen[s.toLowerCase()]){seen[s.toLowerCase()]=1;subs.push(s);}});
@@ -274,24 +305,35 @@ function render(){
     return true;
   }).sort(function(a,b){
     if(a.done!==b.done) return a.done?1:-1;
-    return new Date(a.due)-new Date(b.due);
+    var c=new Date(a.due)-new Date(b.due); return c||(W[a.pri||"mid"]-W[b.pri||"mid"]);
   });
 
   if(!rows.length){
     $("list").innerHTML='<div class="empty">'+(tasks.length?"Tidak ada tugas yang cocok dengan filter ini.":"Belum ada tugas. Tekan “Tambah tugas” untuk mulai mencatat.")+'</div>';
     return;
   }
-  $("list").innerHTML=rows.map(function(t){
-    var l=level(t,now);
+  var groups=[["late","Terlambat"],["today","Hari ini"],["tom","Besok"],["week","Minggu ini"],["later","Nanti"],["done","Selesai"]], bk={};
+  rows.forEach(function(t){
+    var k; if(t.done) k="done"; else{var d=dayDiff(t.due); k=d<0?"late":d===0?"today":d===1?"tom":d<=7?"week":"later";}
+    (bk[k]=bk[k]||[]).push(t);
+  });
+  function card(t){
+    var l=level(t), hasS=t.subs&&t.subs.length, ds=hasS?t.subs.filter(function(x){return x.d}).length:0;
+    var badge=t.pri==="high"?'<span class="pri hi">Tinggi</span>':t.pri==="low"?'<span class="pri lo">Rendah</span>':"";
+    var chk=hasS?'<ul class="chk">'+t.subs.map(function(x,i){return '<li><label><input type="checkbox" data-a="sub" data-i="'+i+'"'+(x.d?" checked":"")+'><span>'+esc(x.t)+'</span></label></li>'}).join("")+'</ul>':"";
+    var prog=hasS?'<div class="prog"><span class="mut">'+ds+' dari '+t.subs.length+' sub-tugas</span><output style="margin-left:auto">'+t.progress+'%</output></div>'
+      :'<div class="prog"><input type="range" data-a="prog" min="0" max="100" step="5" value="'+t.progress+'" aria-label="Progres tugas"><output>'+t.progress+'%</output></div>';
     return '<article class="task '+l+'" data-id="'+esc(t.id)+'">'+
     '<div class="top"><input type="checkbox" data-a="toggle" aria-label="Tandai selesai"'+(t.done?" checked":"")+'>'+
-    '<div style="flex:1;min-width:0"><div class="ttl">'+(t.subject?'<span class="mapel">'+esc(t.subject)+'</span>':"")+esc(t.title)+'</div>'+
-    '<div class="due">'+esc(fmt(t.due))+(t.done?"":' · <span class="left">'+esc(rel(t,now))+'</span>')+'</div></div></div>'+
-    (t.detail?'<p class="det">'+esc(t.detail)+'</p>':"")+
-    '<div class="prog"><input type="range" data-a="prog" min="0" max="100" step="5" value="'+t.progress+'" aria-label="Progres tugas"><output>'+t.progress+'%</output></div>'+
+    '<div style="flex:1;min-width:0"><div class="ttl">'+badge+(t.subject?'<span class="mapel">'+esc(t.subject)+'</span>':"")+esc(t.title)+'</div>'+
+    '<div class="due">'+esc(fmt(t.due))+(t.done?"":' \u00b7 <span class="left">'+esc(rel(t))+'</span>')+'</div></div></div>'+
+    (t.detail?'<p class="det">'+esc(t.detail)+'</p>':"")+chk+prog+
     '<div class="meter"><i style="width:'+t.progress+'%"></i></div>'+
     '<div class="acts"><button class="btn sm sec" data-a="edit" type="button">Ubah</button><button class="btn sm sec danger" data-a="del" type="button">Hapus</button></div>'+
     '</article>';
+  }
+  $("list").innerHTML=groups.filter(function(g){return bk[g[0]]}).map(function(g){
+    return '<h2 class="grp">'+g[1]+'<span>'+bk[g[0]].length+'</span></h2>'+bk[g[0]].map(card).join("");
   }).join("");
 }
 
@@ -302,6 +344,7 @@ function openForm(t){
   $("fMapel").value=t?t.subject:""; $("fTitle").value=t?t.title:""; $("fDetail").value=t?t.detail:"";
   setDue(t?t.due:""); $("calWrap").hidden=true; $("fDueBtn").setAttribute("aria-expanded","false");
   $("fProg").value=t?t.progress:0; $("fProgV").textContent=t?t.progress:0;
+  $("fPri").value=t&&t.pri?t.pri:"mid"; $("fSubs").value=t&&t.subs?t.subs.map(function(x){return x.t}).join("\n"):"";
   $("fMsg").textContent=""; $("btnSave").textContent=t?"Simpan perubahan":"Simpan tugas";
   $("formPanel").hidden=false;
   $("fTitle").focus(); $("formPanel").scrollIntoView({block:"nearest"});
@@ -312,9 +355,13 @@ function saveForm(){
   var title=$("fTitle").value.trim(), due=$("fDue").value, msg=$("fMsg");
   if(!title){msg.textContent="Judul tugas wajib diisi."; msg.style.color="var(--late)"; $("fTitle").focus(); return;}
   if(!due){msg.textContent="Pilih tanggal deadline."; msg.style.color="var(--late)"; $("fDueBtn").focus(); return;}
+  var old=editId?find(editId):null, prev={};
+  if(old&&old.subs) old.subs.forEach(function(x){prev[x.t]=x.d});
+  var subs=$("fSubs").value.split("\n").map(function(x){return x.trim()}).filter(Boolean).slice(0,30).map(function(x){x=x.slice(0,120);return {t:x,d:!!prev[x]}});
   var p=Number($("fProg").value)||0;
-  var data={subject:$("fMapel").value.trim(),title:title,detail:$("fDetail").value.trim(),due:due,progress:p,done:p===100};
-  if(editId){var t=find(editId); if(t){t.subject=data.subject;t.title=data.title;t.detail=data.detail;t.due=data.due;t.progress=p;t.done=p===100;}}
+  if(subs.length) p=Math.round(subs.filter(function(x){return x.d}).length*100/subs.length);
+  var data={subject:$("fMapel").value.trim(),title:title,detail:$("fDetail").value.trim(),due:due,progress:p,done:p===100,subs:subs,pri:$("fPri").value};
+  if(old){old.subject=data.subject;old.title=data.title;old.detail=data.detail;old.due=data.due;old.progress=p;old.done=data.done;old.subs=subs;old.pri=data.pri;}
   else{data.id=uid(); tasks.push(data);}
   save(); closeForm(); render();
 }
@@ -372,7 +419,16 @@ list.addEventListener("click",function(e){
   var a=el.getAttribute("data-a");
   if(a==="edit") openForm(t);
   else if(a==="del"){ ask('Hapus tugas "'+t.title+'"?',"Hapus",function(){tasks=tasks.filter(function(x){return x!==t}); save(); render();}); }
-  else if(a==="toggle"){ t.done=el.checked; t.progress=t.done?100:(t.progress===100?0:t.progress); save(); render(); }
+  else if(a==="toggle"){
+    t.done=el.checked; t.progress=t.done?100:(t.progress===100?0:t.progress);
+    if(t.subs&&t.subs.length){t.subs.forEach(function(x){x.d=t.done}); t.progress=t.done?100:0;}
+    save(); render();
+  }
+  else if(a==="sub"){
+    var i=Number(el.getAttribute("data-i")); if(!t.subs||!t.subs[i]) return;
+    t.subs[i].d=el.checked; t.progress=Math.round(t.subs.filter(function(x){return x.d}).length*100/t.subs.length); t.done=t.progress===100;
+    save(); render();
+  }
 });
 list.addEventListener("input",function(e){
   var el=e.target; if(el.getAttribute("data-a")!=="prog") return;
@@ -406,6 +462,19 @@ function showView(set){
 $("btnBackup").onclick=function(){showView(true)};
 $("btnBack").onclick=function(){showView(false)};
 
+var ACC_KEY="tugas-sekolah-accent";
+function applyAcc(c){
+  var r=document.documentElement.style;
+  if(c){r.setProperty("--acc",c); r.setProperty("--accink","#fff");} else {r.removeProperty("--acc"); r.removeProperty("--accink");}
+  Array.prototype.forEach.call(document.querySelectorAll("#swatches button"),function(b){b.setAttribute("aria-pressed",(b.getAttribute("data-c")||"")===(c||"")?"true":"false")});
+  var m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute("content",c||"#3d4fd6");
+}
+(function(){var c=""; try{c=localStorage.getItem(ACC_KEY)||"";}catch(e){} if(!/^#[0-9a-f]{6}$/i.test(c)) c=""; applyAcc(c);})();
+$("swatches").onclick=function(e){
+  var b=e.target.closest("button"); if(!b) return;
+  var c=b.getAttribute("data-c")||""; applyAcc(c);
+  try{localStorage.setItem(ACC_KEY,c);}catch(x){}
+};
 var THEME_KEY="tugas-sekolah-theme";
 function applyTheme(v){
   var r=document.documentElement;
